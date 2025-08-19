@@ -55,13 +55,17 @@ docker run -p 8080:8080 -e NEXT_PUBLIC_ADOBE_EMBED_CLIENT_ID=YOUR_ADOBE_CLIENT_I
 Provide:
 
 ```
-- ADOBE_EMBED_API_KEY or NEXT_PUBLIC_ADOBE_EMBED_CLIENT_ID
-- LLM_PROVIDER=gemini
-- GEMINI_MODEL=gemini-2.5-flash
-- GOOGLE_API_KEY (Gemini)
-- TTS_PROVIDER=azure (optional)
-- AZURE_TTS_KEY (optional)
-- AZURE_TTS_ENDPOINT (optional)
+# API Keys
+GOOGLE_API_KEY=AIzaSyCx6vT2usg0NUmn5HWeULfjpId1o-dK2cg
+GEMINI_API_KEY=AIzaSyCx6vT2usg0NUmn5HWeULfjpId1o-dK2cg
+AZURE_TTS_KEY=9D11SwxpHbQrnWCFYt73vKShJGponxUOyfUvcaHDHh6Mp8GdpjNkJQQJ99BHACGhslBXJ3w3AAAYACOGQ9Xr
+AZURE_TTS_REGION=centralindia
+
+# Enable features  
+LLM_PROVIDER=gemini
+TTS_PROVIDER=azure
+GEMINI_MODEL=gemini-2.5-flash
+
 ```
 
 ## Where features show up
