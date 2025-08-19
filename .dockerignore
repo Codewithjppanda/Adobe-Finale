@@ -1,0 +1,47 @@
+# Git and version control
+.git
+.gitignore
+*.md
+README.md
+
+# Node.js
+frontend/node_modules
+frontend/.next
+frontend/out
+frontend/.env*
+
+# Python
+backend/__pycache__
+backend/**/__pycache__
+backend/.env
+backend/store/bulk_uploads/*.pdf
+backend/store/fresh_uploads/*.pdf
+backend/store/viewer_uploads/*.pdf
+backend/store/*.mp3
+backend/store/semantic_index/*
+
+# Development files
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+
+# Test files
+backend/test_*.py
+backend/test_*.json
+
+# Documentation
+ENV_SETUP.md
+ENV_UPDATE.md
+REFRESH_FUNCTIONALITY_GUIDE.md
+UX_ENHANCEMENT_TEST_GUIDE.md
+DESIGN_SYSTEM.md
+
+# Temporary files
+nul

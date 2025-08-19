@@ -108,10 +108,3 @@ def _start_store_cleanup_thread() -> None:
 _start_store_cleanup_thread()
 
 
-@app.get("/config.js")
-def runtime_config_js() -> Response:
-    client_id = os.environ.get("NEXT_PUBLIC_ADOBE_EMBED_CLIENT_ID") or os.environ.get("ADOBE_EMBED_API_KEY") or os.environ.get("ADOBE_EMBED_CLIENT_ID") or ""
-    body = f"window.__ADOBE_CLIENT_ID__ = '{client_id}';"
-    return Response(content=body, media_type="application/javascript")
-
-

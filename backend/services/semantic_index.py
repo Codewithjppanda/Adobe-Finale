@@ -289,11 +289,11 @@ class EnhancedSectionExtractor:
                 for line in lines:
                     line_clean = line.strip()
                     if not line_clean:
-                    continue
+                        continue
                         
                     if not found_heading and title in line_clean:
                         found_heading = True
-                    continue
+                        continue
                     
                     if found_heading:
                         content_lines.append(line_clean)
@@ -336,10 +336,10 @@ class SemanticIndex:
                 print(f"⚠️ Could not load BGE model: {e}")
                 try:
                     # Fallback to default model
-                self.embedding = TextEmbedding()
+                    self.embedding = TextEmbedding()
                     print("✅ Using default fastembed model")
-            except Exception:
-                self.embedding = None
+                except Exception:
+                    self.embedding = None
                     print("⚠️ No embedding model available, using fallback")
 
         # Dynamic vector dimension based on model
@@ -374,7 +374,7 @@ class SemanticIndex:
                 self.vectors = np.load(vec_path)
         except Exception:
             self.sections = []
-            self.vectors = np.empty((0, self.vector_dim), dtype=np.float32)
+            self.vectors = np.empty((0, 384), dtype=np.float32)
 
     def _save(self) -> None:
         tmp_meta = {"sections": [asdict(s) for s in self.sections]}
@@ -437,16 +437,16 @@ class SemanticIndex:
                     # Create chunk-specific title
                     chunk_title = f"{title} (Part {chunk_idx + 1})" if len(chunks) > 1 else title
                     
-                new_sections.append(
-                    IndexedSection(
-                        section_id=section_id,
-                        doc_id=doc_id,
-                        filename=filename,
-                        page=page,
+                    new_sections.append(
+                        IndexedSection(
+                            section_id=section_id,
+                            doc_id=doc_id,
+                            filename=filename,
+                            page=page,
                             title=chunk_title,
                             text=chunk_content,
-                        snippet=snippet,
-                        vector_offset=0,
+                            snippet=snippet,
+                            vector_offset=0,
                             # Enhanced structured data fields
                             pdf_name=pdf_name,
                             section_heading=title,
