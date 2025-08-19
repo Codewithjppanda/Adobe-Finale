@@ -123,3 +123,10 @@ credentials.json
 .env
 *.env
 backend/.env
+
+# Data and cache files
+backend/store/bulk_uploads/
+backend/store/fresh_uploads/
+backend/store/*.mp3
+backend/store/semantic_index/embeddings_cache/
+backend/store/semantic_index/vectors.npy
