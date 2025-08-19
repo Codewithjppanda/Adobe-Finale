@@ -29,7 +29,7 @@ uvicorn main:app --reload --port 8000
 - Configure Adobe Embed: create `frontend/.env.local`
 
 ```ini
-NEXT_PUBLIC_ADOBE_EMBED_CLIENT_ID=YOUR_ADOBE_CLIENT_ID
+NEXT_PUBLIC_ADOBE_EMBED_CLIENT_ID=6ffd0d77e88743c18889c48c3064c451
 ```
 
 ### Dev run
