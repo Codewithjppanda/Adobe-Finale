@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  doc-intelligence:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+    ports:
+      - "8080:8080"
+    environment:
+      # Required
+      - ADOBE_EMBED_API_KEY=${ADOBE_EMBED_API_KEY}
+      
+      # LLM Configuration (Gemini)
+      - LLM_PROVIDER=gemini
+      - GEMINI_MODEL=gemini-2.5-flash
+      - GOOGLE_APPLICATION_CREDENTIALS=/credentials/adbe-gcp.json
+      
+      # TTS Configuration (Azure)
+      - TTS_PROVIDER=azure
+      - AZURE_TTS_KEY=${AZURE_TTS_KEY}
+      - AZURE_TTS_ENDPOINT=${AZURE_TTS_ENDPOINT}
+      
+      # Optional
+      - HOST=0.0.0.0
+      - PORT=8080
+      - STORE_TTL_SECONDS=0
+    volumes:
+      # Mount credentials directory
+      - ./credentials:/credentials:ro
+      # Optionally mount storage for persistence
+      - doc-storage:/app/backend/store
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Alternative configuration for local services
+  doc-intelligence-local:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+    ports:
+      - "8080:8080"
+    environment:
+      # Required
+      - ADOBE_EMBED_API_KEY=${ADOBE_EMBED_API_KEY}
+      
+      # Local LLM (Ollama)
+      - LLM_PROVIDER=ollama
+      - OLLAMA_MODEL=llama3
+      
+      # Local TTS
+      - TTS_PROVIDER=local
+      
+      # Optional
+      - HOST=0.0.0.0
+      - PORT=8080
+      - STORE_TTL_SECONDS=0
+    volumes:
+      - doc-storage:/app/backend/store
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    profiles:
+      - local
+
+volumes:
+  doc-storage:
+    driver: local

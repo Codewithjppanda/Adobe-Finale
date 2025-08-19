@@ -1,0 +1,90 @@
+/* Design Tokens for Document Intelligence */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap');
+
+:root {
+  /* Colors */
+  --bg: #FFFFFF;
+  --surface: #F7F7FB;
+  --text: #0B0B11;
+  --text-muted: #6B7280;
+  --accent-primary: #8B5CF6;
+  --accent-secondary: #22D3EE;
+  --accent-tertiary: #60A5FA;
+  --stroke: #E8E8EF;
+  --stroke-light: #F3F4F6;
+  
+  /* Typography */
+  --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  
+  /* Spacing */
+  --space-xs: 0.25rem;   /* 4px */
+  --space-sm: 0.5rem;    /* 8px */
+  --space-md: 1rem;      /* 16px */
+  --space-lg: 1.5rem;    /* 24px */
+  --space-xl: 2rem;      /* 32px */
+  --space-2xl: 3rem;     /* 48px */
+  --space-3xl: 4rem;     /* 64px */
+  
+  /* Border Radius */
+  --radius-sm: 0.5rem;   /* 8px */
+  --radius-md: 0.75rem;  /* 12px */
+  --radius-lg: 1rem;     /* 16px */
+  --radius-xl: 1.5rem;   /* 24px */
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-premium: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.dark {
+  /* Dark mode colors */
+  --bg: #0B0B11;
+  --surface: #11121A;
+  --text: #EDEDF2;
+  --text-muted: #9CA3AF;
+  --stroke: #1F2030;
+  --stroke-light: #1A1B23;
+  --shadow-premium: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+
+/* Font classes */
+.font-ui {
+  font-family: var(--font-ui);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* Gradient utilities */
+.gradient-accent {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary), var(--accent-tertiary));
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary), var(--accent-tertiary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Glass effect */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dark .glass {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Premium shadows */
+.shadow-premium {
+  box-shadow: var(--shadow-premium);
+}
