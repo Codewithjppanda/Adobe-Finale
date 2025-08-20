@@ -27,6 +27,30 @@ def try_import_azure_sdk():
 try_import_azure_sdk()
 
 
+def generate_fallback_audio(selection: str, matches: List[Dict[str, Any]], insights: List[str]) -> Dict[str, Any]:
+    """Generate fallback audio script when TTS is not available"""
+    
+    # Create a podcast script
+    script_parts = generate_podcast_script(selection, matches, insights)
+    
+    # Combine all text for easy reading
+    full_script = ""
+    for part in script_parts:
+        speaker = "Host" if part["speaker"] == "host" else "Analyst"
+        full_script += f"[{speaker}]: {part['text']}\n\n"
+    
+    # Return the script with fallback audio URL for browser TTS
+    return {
+        "audio_url": "fallback_browser_tts",  # Special URL to trigger browser TTS
+        "script": full_script,
+        "duration_estimate": len(full_script.split()) / 150,  # Rough estimate: 150 words per minute
+        "error": None,
+        "speakers": 2,
+        "fallback_mode": True,
+        "message": "Using browser TTS for natural podcast experience!"
+    }
+
+
 router = APIRouter()
 
 
@@ -39,12 +63,12 @@ def generate_podcast_script(selection: str, matches: List[Dict[str, Any]], insig
     # Introduction
     script.append({
         "speaker": "host",
-        "text": "Welcome to Document Intelligence Insights! I'm your host, and today we're exploring some fascinating connections across your documents."
+        "text": "Welcome to Document Intelligence Insights! I'm your host, and today we're diving deep into some fascinating connections across your document library."
     })
     
     script.append({
         "speaker": "analyst",
-        "text": f"That's right! Our reader just highlighted an interesting passage: '{selection[:100]}...' Let me show you what I found related to this."
+        "text": f"Absolutely! Our reader has highlighted a really interesting passage here. Let me read a bit of it: '{selection[:100]}...' This is quite intriguing. Let me show you what I discovered related to this content."
     })
     
     # Discuss related sections
@@ -63,39 +87,39 @@ def generate_podcast_script(selection: str, matches: List[Dict[str, Any]], insig
             if i == 1:
                 script.append({
                     "speaker": "analyst",
-                    "text": f"First up, I found something really relevant in {pdf_name}, specifically in the {section} section. {relevance}. It says: '{snippet}...'"
+                    "text": f"First up, I found something really relevant in {pdf_name}, specifically in the {section} section. {relevance}. Here's what it says: '{snippet}...'"
                 })
             else:
-                connector = "Another interesting connection" if i == 2 else "And finally"
+                connector = "Another fascinating connection" if i == 2 else "And finally, here's one more"
                 script.append({
                     "speaker": "analyst",
-                    "text": f"{connector} appears in {pdf_name}, under {section}. This mentions: '{snippet}...'"
+                    "text": f"{connector} I discovered in {pdf_name}, under {section}. This content mentions: '{snippet}...'"
                 })
             
-            # Host reaction
+            # Host reaction with more natural conversation
             if i == 1:
                 script.append({
                     "speaker": "host",
-                    "text": "That's a great connection! How does this relate to our selected text?"
+                    "text": "That's a fantastic connection! I can see how this relates to what our reader highlighted. What other insights did you find?"
                 })
             elif i == 2:
                 script.append({
                     "speaker": "host",
-                    "text": "Interesting! I'm starting to see a pattern here."
+                    "text": "Wow, this is really building into something interesting! I'm seeing a clear pattern emerging here."
                 })
     
     # Discuss insights
     if insights:
         script.append({
             "speaker": "host",
-            "text": "Based on these connections, what insights can we draw?"
+            "text": "This is fascinating! Based on all these connections we've discovered, what key insights can we draw from this analysis?"
         })
         
         for i, insight in enumerate(insights[:4], 1):
             if i == 1:
                 script.append({
                     "speaker": "analyst",
-                    "text": f"Well, here's what stands out to me: {insight}"
+                    "text": f"Great question! Here's what really stands out to me: {insight}"
                 })
             elif i == 2:
                 script.append({
@@ -151,11 +175,9 @@ async def generate_audio(
     azure_key = os.environ.get("AZURE_TTS_KEY")
     azure_endpoint = os.environ.get("AZURE_TTS_ENDPOINT") or os.environ.get("AZURE_TTS_REGION", "eastus")
     
-    if not azure_key:
-        return {
-            "audio_url": None,
-            "error": "Missing AZURE_TTS_KEY. Please configure Azure Text-to-Speech credentials."
-        }
+    if not azure_key or azure_key == "TTS_KEY":
+        # Provide fallback script generation when TTS is not available
+        return generate_fallback_audio(selection, matches, insights)
     
     try:
         # Generate podcast script with multiple speakers

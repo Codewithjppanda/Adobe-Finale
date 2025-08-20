@@ -293,7 +293,7 @@ class EnhancedSectionExtractor:
                         
                     if not found_heading and title in line_clean:
                         found_heading = True
-                        continue
+                    continue
                     
                     if found_heading:
                         content_lines.append(line_clean)
@@ -331,16 +331,16 @@ class SemanticIndex:
                     max_length=512,  # Optimal chunk size
                     cache_dir=os.path.join(INDEX_DIR, "embeddings_cache")
                 )
-                print("✅ Using enhanced BGE embedding model for better accuracy")
+                print("Using enhanced BGE embedding model for better accuracy")
             except Exception as e:
-                print(f"⚠️ Could not load BGE model: {e}")
+                print(f"Could not load BGE model: {e}")
                 try:
                     # Fallback to default model
                     self.embedding = TextEmbedding()
-                    print("✅ Using default fastembed model")
+                    print("Using default fastembed model")
                 except Exception:
                     self.embedding = None
-                    print("⚠️ No embedding model available, using fallback")
+                print("No embedding model available, using fallback")
 
         # Dynamic vector dimension based on model
         self.vector_dim = 384  # Default fallback dimension
@@ -349,7 +349,7 @@ class SemanticIndex:
                 # Test embedding to get actual dimension
                 test_emb = list(self.embedding.embed(["test"]))
                 self.vector_dim = len(test_emb[0])
-                print(f"✅ Embedding model dimension: {self.vector_dim}")
+                print(f"Embedding model dimension: {self.vector_dim}")
             except:
                 pass
 
@@ -437,25 +437,25 @@ class SemanticIndex:
                     # Create chunk-specific title
                     chunk_title = f"{title} (Part {chunk_idx + 1})" if len(chunks) > 1 else title
                     
-                    new_sections.append(
-                        IndexedSection(
-                            section_id=section_id,
-                            doc_id=doc_id,
-                            filename=filename,
-                            page=page,
-                            title=chunk_title,
-                            text=chunk_content,
-                            snippet=snippet,
-                            vector_offset=0,
-                            # Enhanced structured data fields
-                            pdf_name=pdf_name,
-                            section_heading=title,
-                            section_content=chunk_content
-                        )
+                new_sections.append(
+                    IndexedSection(
+                        section_id=section_id,
+                        doc_id=doc_id,
+                        filename=filename,
+                        page=page,
+                        title=chunk_title,
+                        text=chunk_content,
+                        snippet=snippet,
+                        vector_offset=0,
+                        # Enhanced structured data fields
+                        pdf_name=pdf_name,
+                        section_heading=title,
+                        section_content=chunk_content
                     )
-                    # Use chunk content for better semantic matching
-                    combined_text = f"{title}. {chunk_content}"
-                    new_vectors.append(combined_text)
+                )
+                # Use chunk content for better semantic matching
+                combined_text = f"{title}. {chunk_content}"
+                new_vectors.append(combined_text)
 
         # Embed snippets for speed
         vecs = self._embed_texts(new_vectors)

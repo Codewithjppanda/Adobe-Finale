@@ -40,6 +40,8 @@ export default function RelatedPanel({
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [currentInsightIndex, setCurrentInsightIndex] = useState(0);
   const [showInsightCard, setShowInsightCard] = useState(false);
+  const [audioScript, setAudioScript] = useState<string>("");
+
   // Clear insights and related state when selection changes
   useEffect(() => {
     setInsights([]);
@@ -107,12 +109,15 @@ export default function RelatedPanel({
         voice: "en-US-AriaNeural"
       });
       
-      if (res.audio_url) {
+      if (res.audio_url && res.audio_url !== "fallback_browser_tts") {
         setAudioUrl(`http://localhost:8000${res.audio_url}`);
-      } else if (res.script) {
-        // Show the script if available
-        console.log("📝 Podcast Script:", res.script);
-        alert(`🎙️ Podcast Script Ready!\n\n${res.script?.substring(0, 500)}...`);
+        setAudioScript(""); // Clear any previous script
+      } else if (res.audio_url === "fallback_browser_tts" && res.script) {
+        // Browser TTS fallback mode
+        console.log("🎙️ Browser TTS Podcast:", res.script);
+        setAudioUrl("fallback_browser_tts");
+        setAudioScript(res.script);
+        // Don't show script modal - just enable audio playback
       } else if (res.error) {
         console.error("Audio generation error:", res.error);
       }
@@ -126,6 +131,242 @@ export default function RelatedPanel({
   const toggleAudio = () => {
     if (!audioUrl) return;
 
+    // Handle fallback mode (browser TTS)
+    if (audioUrl === "fallback_browser_tts") {
+      if (isPlaying) {
+        // Stop TTS
+        if (window.speechSynthesis) {
+          window.speechSynthesis.cancel();
+        }
+        setIsPlaying(false);
+      } else {
+        // Start TTS with realistic podcast experience
+        if (window.speechSynthesis && audioScript) {
+          // Get available voices and select the best ones for our speakers
+          const voices = window.speechSynthesis.getVoices();
+          
+          // Select specific voices for Host and Analyst
+          let hostVoice: SpeechSynthesisVoice | null = null;
+          let analystVoice: SpeechSynthesisVoice | null = null;
+          
+          // Try to find the best available voices
+          if (voices.length > 0) {
+            // Look for specific voice names that sound natural
+            const preferredHostVoices = ['Samantha', 'Victoria', 'Karen', 'Alex', 'Zoe', 'Emma', 'Olivia', 'Sophia', 'Chloe', 'Ava'];
+            const preferredAnalystVoices = ['Daniel', 'Tom', 'Mark', 'David', 'James', 'Michael', 'Robert', 'William', 'John', 'Christopher'];
+            
+            // Find host voice (FEMALE PRIORITY)
+            for (const voiceName of preferredHostVoices) {
+              const voice = voices.find(v => v.name.includes(voiceName));
+              if (voice) {
+                hostVoice = voice;
+                console.log(' Found preferred female host voice:', voice.name);
+                break;
+              }
+            }
+            
+            // Find analyst voice (MALE PRIORITY)
+            for (const voiceName of preferredAnalystVoices) {
+              const voice = voices.find(v => v.name.includes(voiceName));
+              if (voice) {
+                analystVoice = voice;
+                console.log('🎙️ Found preferred male analyst voice:', voice.name);
+                break;
+              }
+            }
+            
+            // GUARANTEE one female, one male - more aggressive fallback
+            if (!hostVoice) {
+              // Look for any female voice - MORE AGGRESSIVE
+              const femaleVoice = voices.find(v => 
+                v.lang.includes('en') && 
+                (v.name.toLowerCase().includes('female') || 
+                 v.name.toLowerCase().includes('samantha') ||
+                 v.name.toLowerCase().includes('victoria') ||
+                 v.name.toLowerCase().includes('karen') ||
+                 v.name.toLowerCase().includes('zoe') ||
+                 v.name.toLowerCase().includes('emma') ||
+                 v.name.toLowerCase().includes('olivia') ||
+                 v.name.toLowerCase().includes('sophia') ||
+                 v.name.toLowerCase().includes('chloe') ||
+                 v.name.toLowerCase().includes('ava') ||
+                 v.name.toLowerCase().includes('alex') ||
+                 v.name.toLowerCase().includes('jennifer') ||
+                 v.name.toLowerCase().includes('lisa') ||
+                 v.name.toLowerCase().includes('sarah'))
+              );
+              if (femaleVoice) {
+                hostVoice = femaleVoice;
+                console.log(' Found fallback female host voice:', femaleVoice.name);
+              }
+            }
+            
+            if (!analystVoice) {
+              // Look for any male voice - MORE AGGRESSIVE
+              const maleVoice = voices.find(v => 
+                v.lang.includes('en') && 
+                (v.name.toLowerCase().includes('male') || 
+                 v.name.toLowerCase().includes('daniel') ||
+                 v.name.toLowerCase().includes('tom') ||
+                 v.name.toLowerCase().includes('mark') ||
+                 v.name.toLowerCase().includes('david') ||
+                 v.name.toLowerCase().includes('james') ||
+                 v.name.toLowerCase().includes('michael') ||
+                 v.name.toLowerCase().includes('robert') ||
+                 v.name.toLowerCase().includes('william') ||
+                 v.name.toLowerCase().includes('john') ||
+                 v.name.toLowerCase().includes('christopher') ||
+                 v.name.toLowerCase().includes('andrew') ||
+                 v.name.toLowerCase().includes('steven') ||
+                 v.name.toLowerCase().includes('kevin'))
+              );
+              if (maleVoice) {
+                analystVoice = maleVoice;
+                console.log('🎙️ Found fallback male analyst voice:', maleVoice.name);
+              }
+            }
+            
+            // Final fallback - ensure we have different voices
+            if (!hostVoice && !analystVoice) {
+              // If we still don't have specific voices, pick any two different ones
+              const englishVoices = voices.filter(v => v.lang.includes('en'));
+              if (englishVoices.length >= 2) {
+                hostVoice = englishVoices[0] || null;
+                analystVoice = englishVoices[1] || null;
+              } else if (voices.length >= 2) {
+                hostVoice = voices[0] || null;
+                analystVoice = voices[1] || null;
+              }
+            }
+            
+            // If we only have one voice, duplicate it but with different settings
+            if (hostVoice && !analystVoice) {
+              analystVoice = hostVoice;
+            } else if (analystVoice && !hostVoice) {
+              hostVoice = analystVoice;
+            }
+            
+            // Log the selected voices for debugging
+            console.log(' Selected Voices:', {
+              host: hostVoice ? `${hostVoice.name} (${hostVoice.lang})` : 'None',
+              analyst: analystVoice ? `${analystVoice.name} (${analystVoice.lang})` : 'None',
+              totalAvailable: voices.length
+            });
+          }
+          
+          // Split script into speaker parts for natural conversation
+          const scriptLines = audioScript.split('\n').filter(line => line.trim());
+          let currentSpeaker = '';
+          let currentText = '';
+          const utterances: SpeechSynthesisUtterance[] = [];
+          
+          for (const line of scriptLines) {
+            if (line.startsWith('[Host]:') || line.startsWith('[Analyst]:')) {
+              // Save previous utterance if exists
+              if (currentText.trim()) {
+                const utterance = new SpeechSynthesisUtterance(currentText.trim());
+                
+                // Apply speaker-specific voice settings with MAJOR differences
+                if (currentSpeaker === 'Host' && hostVoice) {
+                  utterance.voice = hostVoice;
+                  utterance.rate = 0.9; // Slightly faster for host
+                  utterance.pitch = 1.3; // Much higher pitch for female host
+                  utterance.volume = 0.95;
+                } else if (currentSpeaker === 'Analyst' && analystVoice) {
+                  utterance.voice = analystVoice;
+                  utterance.rate = 0.8; // Slower, more thoughtful for analyst
+                  utterance.pitch = 0.7; // Much lower pitch for male analyst
+                  utterance.volume = 1.0;
+                }
+                
+                // ALWAYS force pitch differentiation regardless of voice selection
+                if (currentSpeaker === 'Host') {
+                  utterance.pitch = 1.4; // Very high for female host
+                } else if (currentSpeaker === 'Analyst') {
+                  utterance.pitch = 0.6; // Very low for male analyst
+                }
+                
+                utterances.push(utterance);
+              }
+              
+              // Start new speaker
+              currentSpeaker = line.includes('Host') ? 'Host' : 'Analyst';
+              currentText = line.replace(/^\[(Host|Analyst)\]:\s*/, '');
+            } else {
+              currentText += ' ' + line.trim();
+            }
+          }
+          
+          // Add the last utterance
+          if (currentText.trim()) {
+            const utterance = new SpeechSynthesisUtterance(currentText.trim());
+            
+            // Apply speaker-specific voice settings for the last utterance with MAJOR differences
+            if (currentSpeaker === 'Host' && hostVoice) {
+              utterance.voice = hostVoice;
+              utterance.rate = 0.9;
+              utterance.pitch = 1.3; // Much higher pitch for female host
+              utterance.volume = 0.95;
+            } else if (currentSpeaker === 'Analyst' && analystVoice) {
+              utterance.voice = analystVoice;
+              utterance.rate = 0.8;
+              utterance.pitch = 0.7; // Much lower pitch for male analyst
+              utterance.volume = 1.0;
+            }
+            
+            // ALWAYS force pitch differentiation for last utterance regardless of voice selection
+            if (currentSpeaker === 'Host') {
+              utterance.pitch = 1.4; // Very high for female host
+            } else if (currentSpeaker === 'Analyst') {
+              utterance.pitch = 0.6; // Very low for male analyst
+            }
+            
+            utterances.push(utterance);
+          }
+          
+          // Play utterances sequentially with natural conversation flow
+          let currentIndex = 0;
+          
+          const playNext = () => {
+            if (currentIndex < utterances.length) {
+              const utterance = utterances[currentIndex];
+              
+              // Add natural pauses and transitions
+              utterance.onend = () => {
+                currentIndex++;
+                if (currentIndex < utterances.length) {
+                  // Dynamic pause between speakers - longer for topic changes
+                  const nextUtterance = utterances[currentIndex];
+                  // Determine speaker based on pitch (higher = Host, lower = Analyst)
+                  const currentSpeakerType = utterance.pitch > 1.0 ? 'Host' : 'Analyst';
+                  const nextSpeakerType = nextUtterance.pitch > 1.0 ? 'Host' : 'Analyst';
+                  const isSameSpeaker = currentSpeakerType === nextSpeakerType;
+                  const pauseDuration = isSameSpeaker ? 200 : 500; // Longer pause between different speakers
+                  
+                  setTimeout(playNext, pauseDuration);
+                } else {
+                  setIsPlaying(false);
+                }
+              };
+              
+              utterance.onerror = (event) => {
+                console.error('TTS error:', event);
+                setIsPlaying(false);
+              };
+              
+              // Speak the current utterance
+              window.speechSynthesis.speak(utterance);
+            }
+          };
+          
+          setIsPlaying(true);
+          playNext();
+        }
+      }
+      return;
+    }
+
+    // Handle regular audio
     if (!audioElement) {
       const audio = new Audio(audioUrl);
       audio.onended = () => setIsPlaying(false);
@@ -267,6 +508,8 @@ export default function RelatedPanel({
               {isPlaying ? "Pause" : "Play"}
         </Button>
           )}
+          
+
         </div>
       </div>
       <div className="text-xs text-muted-foreground">
@@ -521,6 +764,8 @@ export default function RelatedPanel({
           </>
         )}
       </AnimatePresence>
+      
+
     </div>
   );
 }
