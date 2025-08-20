@@ -40,8 +40,6 @@ export default function RelatedPanel({
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [currentInsightIndex, setCurrentInsightIndex] = useState(0);
   const [showInsightCard, setShowInsightCard] = useState(false);
-  const [showTooltip, setShowTooltip] = useState(false);
-
   // Clear insights and related state when selection changes
   useEffect(() => {
     setInsights([]);
@@ -51,18 +49,6 @@ export default function RelatedPanel({
     setAudioElement(null);
     setIsPlaying(false);
   }, [selection]);
-
-  // Show tooltip when matches are found for the first time
-  useEffect(() => {
-    if (matches.length > 0 && !insights.length && !isSearching) {
-      setShowTooltip(true);
-      // Hide tooltip after 4 seconds
-      const timer = setTimeout(() => {
-        setShowTooltip(false);
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [matches.length, insights.length, isSearching]);
 
   const onInsights = async () => {
     setLoading(true);
@@ -257,39 +243,7 @@ export default function RelatedPanel({
               </motion.div>
             )}
             
-            {/* Tooltip for new users */}
-            <AnimatePresence>
-              {showTooltip && (
-                <motion.div
-                  className="absolute left-14 top-0 z-[100] pointer-events-none"
-                  initial={{ opacity: 0, x: -10, scale: 0.9 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: -10, scale: 0.9 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                >
-                  <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg shadow-xl relative text-sm font-medium whitespace-nowrap border border-blue-300/20">
-                    💡 Click here for insights & podcast!
-                    {/* Arrow pointing to the bulb */}
-                    <div className="absolute left-0 top-1/2 transform -translate-x-2 -translate-y-1/2">
-                      <div className="w-0 h-0 border-t-[6px] border-b-[6px] border-r-[8px] border-transparent border-r-blue-600"></div>
-                    </div>
-                    {/* Subtle animated glow */}
-                    <motion.div 
-                      className="absolute inset-0 bg-blue-400 rounded-lg blur-sm opacity-20 -z-10"
-                      animate={{ 
-                        opacity: [0.2, 0.4, 0.2],
-                        scale: [1, 1.05, 1]
-                      }}
-                      transition={{ 
-                        duration: 2, 
-                        repeat: Infinity,
-                        ease: "easeInOut"
-                      }}
-                    />
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+
           </motion.div>
           
           {/* Audio Controls */}
