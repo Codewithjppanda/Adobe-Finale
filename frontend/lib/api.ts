@@ -1,5 +1,7 @@
-// Point frontend calls to the FastAPI backend on port 8000 during development
-const API = "http://localhost:8000";
+// Use relative URLs so API calls work both in development and Docker
+// In development, this will call localhost:3000/v1/... which gets proxied to localhost:8000
+// In Docker, this will call localhost:8080/v1/... which gets proxied to localhost:8000
+const API = "";
 
 export async function extractOutline(params: { 
   file?: File; 
