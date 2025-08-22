@@ -209,6 +209,13 @@ export async function clearAllStorage() {
     files_removed: number;
     storage_cleared: any;
     index_reset: boolean;
+    index_files_cleared: any;
+    nuclear_clear?: boolean;
+    obliteration_complete?: boolean;
+    verification?: {
+      remaining_files: number;
+      remaining_sections: number;
+    };
   }>;
 }
 

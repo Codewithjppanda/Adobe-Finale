@@ -56,15 +56,27 @@ export default function Home() {
             </div>
             <div className="flex items-center space-x-4">
               <Link href="/reader">
-                <Button className="font-medium cursor-pointer bg-white/10 hover:bg-white/20 dark:bg-gray-800/50 dark:hover:bg-gray-700/50 border border-white/20 dark:border-gray-600 text-white dark:text-gray-200 backdrop-blur-sm">
+                <Button className="
+                  font-medium cursor-pointer 
+                  bg-gray-100 hover:bg-gray-200 
+                  dark:bg-gray-800/80 dark:hover:bg-gray-700/80 
+                  border-2 border-gray-300 dark:border-gray-600 
+                  text-gray-800 dark:text-gray-100 
+                  backdrop-blur-sm
+                  transition-all duration-200
+                  hover:shadow-md
+                  px-4 py-2
+                ">
                   Text Selector
                 </Button>
               </Link>
+              
               <Link href="/viewer/new">
                 <Button className="bg-gradient-to-r from-accent-primary to-accent-secondary text-black font-medium hover:shadow-lg transition-all cursor-pointer">
                   Persona Analyzer
                 </Button>
               </Link>
+              
               <ThemeToggle />
             </div>
           </div>

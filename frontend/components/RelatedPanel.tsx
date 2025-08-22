@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { generateInsights, generateAudio } from "@/lib/api";
-import { ExternalLink, BookOpen, Zap, Volume2, Play, Pause, Lightbulb, X } from "lucide-react";
+import { ExternalLink, BookOpen, Zap, Volume2, Play, Pause, Lightbulb, X, Search, AlertCircle } from "lucide-react";
 
 type Match = { 
   docId: string; 
@@ -402,6 +402,28 @@ export default function RelatedPanel({
     }
   };
 
+  // Add this to handle the "No related text found" case
+  if (matches.length === 0 && selection && !isSearching && searchStatus === "no-results") {
+    return (
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold flex items-center gap-2">
+          <Search className="w-4 h-4" />
+          Related Sections
+          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+            0
+          </span>
+        </h3>
+        <div className="p-4 text-center text-muted-foreground bg-orange-50 border border-orange-200 rounded-lg">
+          <AlertCircle className="w-6 h-6 mx-auto mb-2 text-orange-500" />
+          <p className="text-sm font-medium">No related text found</p>
+          <p className="text-xs mt-1">
+            Try selecting different text or upload more relevant documents
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3 relative overflow-visible">
       <div className="flex items-center justify-between relative overflow-visible">
@@ -725,7 +747,16 @@ export default function RelatedPanel({
                       <div className="flex items-center justify-between">
                         <Button
                           onClick={prevInsight}
-                          className="bg-white/50 hover:bg-white/70 bg-transparent border border-current hover:bg-white/70 px-3 py-1 text-sm"
+                          className="
+                            border-2 border-gray-400 dark:border-gray-500
+                            bg-gray-100 dark:bg-gray-700 
+                            text-gray-800 dark:text-gray-100
+                            hover:bg-gray-200 dark:hover:bg-gray-600
+                            px-3 py-1 text-sm font-semibold
+                            transition-all duration-200
+                            shadow-sm hover:shadow-md
+                            active:scale-95
+                          "
                         >
                           ← Previous
                         </Button>
@@ -735,7 +766,7 @@ export default function RelatedPanel({
                             <motion.div
                               key={index}
                               className={`w-2 h-2 rounded-full ${
-                                index === currentInsightIndex ? 'bg-current' : 'bg-current/30'
+                                index === currentInsightIndex ? 'bg-gray-800 dark:bg-gray-200' : 'bg-gray-400 dark:bg-gray-500'
                               }`}
                               animate={{ scale: index === currentInsightIndex ? 1.2 : 1 }}
                             />
@@ -744,7 +775,16 @@ export default function RelatedPanel({
                         
                         <Button
                           onClick={nextInsight}
-                          className="bg-white/50 hover:bg-white/70 bg-transparent border border-current hover:bg-white/70 px-3 py-1 text-sm"
+                          className="
+                            border-2 border-gray-400 dark:border-gray-500
+                            bg-gray-100 dark:bg-gray-700 
+                            text-gray-800 dark:text-gray-100
+                            hover:bg-gray-200 dark:hover:bg-gray-600
+                            px-3 py-1 text-sm font-semibold
+                            transition-all duration-200
+                            shadow-sm hover:shadow-md
+                            active:scale-95
+                          "
                         >
                           Next →
                         </Button>

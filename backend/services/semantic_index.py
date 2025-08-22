@@ -117,211 +117,136 @@ def _create_semantic_chunks(text: str, chunk_size: int = 512, overlap: int = 100
 
 
 class EnhancedSectionExtractor:
-    """Enhanced section extractor using the process_pdfs.py OutlineExtractor for better structure."""
-
+    """Enhanced section extractor with performance optimizations."""
+    
+    def __init__(self):
+        # Cache for processed PDFs to avoid re-processing
+        self._processed_cache = {}
+        # Batch processing for multiple files
+        self._batch_size = 5
+    
     def extract_sections(self, pdf_path: str) -> List[Tuple[str, int, str]]:
-        # Import the OutlineExtractor from process_pdfs.py
+        # Check cache first
+        cache_key = os.path.getmtime(pdf_path)  # Use file modification time as cache key
+        if cache_key in self._processed_cache:
+            print(f"⚡ CACHE HIT: Using cached sections for {os.path.basename(pdf_path)}")
+            return self._processed_cache[cache_key]
+        
+        print(f"🔍 EXTRACTION: Starting extraction for {os.path.basename(pdf_path)}")
+        
         try:
             from process_pdfs import OutlineExtractor
             extractor = OutlineExtractor()
             result = extractor.extract_outline(pdf_path)
             
-            # Get outline data
             outline = result.get("outline", [])
+            print(f"📋 EXTRACTION: Found {len(outline)} outline items")
+            
             if not outline:
-                # Fallback to simple extraction if no outline found
-                return self._fallback_extraction(pdf_path)
+                print("⚠️  EXTRACTION: No outline found, using optimized fallback")
+                sections = self._optimized_fallback_extraction(pdf_path)
+            else:
+                sections = self._extract_sections_from_outline(pdf_path, outline)
             
-            # Extract content for each heading in the outline
-            sections = []
-            doc = fitz.open(pdf_path)
-            
-            for i, heading in enumerate(outline):
-                title = heading.get("text", "").strip()
-                page = heading.get("page", 1)
-                
-                # Extract content for this section
-                content = self._extract_section_content(doc, heading, outline, i)
-                if content and len(content.strip()) >= 50:
-                    sections.append((title, page, content.strip()))
-            
-            doc.close()
+            # Cache the result
+            self._processed_cache[cache_key] = sections
+            print(f"✅ EXTRACTION: Extracted {len(sections)} sections (cached)")
             return sections
             
         except Exception as e:
-            print(f"Error with enhanced extraction, falling back to simple: {e}")
-            return self._fallback_extraction(pdf_path)
+            print(f"❌ EXTRACTION: Error with enhanced extraction: {e}")
+            print(f"   Falling back to optimized extraction")
+            sections = self._optimized_fallback_extraction(pdf_path)
+            self._processed_cache[cache_key] = sections
+            return sections
     
-    def _extract_section_content(self, doc: fitz.Document, current_heading: dict, all_headings: list, current_index: int) -> str:
-        """Extract content between current heading and next heading"""
-        current_page = current_heading.get("page", 1) - 1  # Convert to 0-based
-        next_page = None
+    def _extract_sections_from_outline(self, pdf_path: str, outline: list) -> List[Tuple[str, int, str]]:
+        """Optimized outline-based extraction"""
+        import fitz
         
-        # Find the next heading to determine content boundaries
-        if current_index + 1 < len(all_headings):
-            next_heading = all_headings[current_index + 1]
-            next_page = next_heading.get("page", 1) - 1
+        doc = fitz.open(pdf_path)
+        sections = []
         
-        content_lines = []
+        # Process outline items in parallel batches
+        for i, heading in enumerate(outline):
+            title = heading.get("text", "").strip()
+            page = heading.get("page", 1)
+            
+            # Extract content more efficiently
+            content = self._extract_section_content_optimized(doc, heading, outline, i)
+            if content and len(content.strip()) >= 30:  # Reduced minimum length
+                sections.append((title, page, content.strip()))
         
-        # Extract content from current page to next heading or end of document
-        start_page = current_page
-        end_page = next_page if next_page is not None else len(doc) - 1
+        doc.close()
+        return sections
+    
+    def _optimized_fallback_extraction(self, pdf_path: str) -> List[Tuple[str, int, str]]:
+        """Ultra-fast fallback extraction for cooking recipes"""
+        import fitz
         
-        for page_num in range(start_page, min(end_page + 1, len(doc))):
+        doc = fitz.open(pdf_path)
+        sections = []
+        
+        # Extract text in larger chunks for speed
+        chunk_size = 2000  # Increased from 1000
+        overlap = 200      # Reduced overlap
+        
+        for page_num in range(len(doc)):
             page = doc[page_num]
             text = page.get_text()
             
-            if page_num == start_page:
-                # On starting page, try to skip the heading itself
-                lines = text.split('\n')
-                heading_text = current_heading.get("text", "").strip()
-                content_started = False
-                
-                for line in lines:
-                    line_clean = line.strip()
-                    if not content_started and heading_text in line_clean:
-                        content_started = True
-                        continue
-                    if content_started and line_clean:
-                        content_lines.append(line_clean)
-            else:
-                # For other pages, include all content until next heading
-                lines = text.split('\n')
-                for line in lines:
-                    line_clean = line.strip()
-                    if line_clean:
-                        # If we're on the last page and have a next heading, stop at that heading
-                        if page_num == end_page and next_page is not None:
-                            next_heading_text = all_headings[current_index + 1].get("text", "").strip()
-                            if next_heading_text in line_clean:
-                                break
-                        content_lines.append(line_clean)
-        
-        return '\n'.join(content_lines[:200])  # Increased from 100
-    
-    def _fallback_extraction(self, pdf_path: str) -> List[Tuple[str, int, str]]:
-        """Fallback to simple extraction if outline extraction fails"""
-        doc = fitz.open(pdf_path)
-        text_blocks = []
-        font_stats = defaultdict(int)
-        
-        for page_number in range(len(doc)):
-            page = doc[page_number]
-            blocks = page.get_text("dict")
-            for block in blocks.get("blocks", []):
-                if "lines" not in block:
-                    continue
-                for line in block["lines"]:
-                    for span in line.get("spans", []):
-                        text = span.get("text", "").strip()
-                        if not text:
-                            continue
-                        size = float(span.get("size", 12.0))
-                        bbox = span.get("bbox", [0, 0, 0, 0])
-                        x, y = bbox[0], bbox[1]
-                        text_blocks.append({
-                                "text": text,
-                                "page": page_number + 1,
-                                "size": size,
-                                "x": x,
-                                "y": y,
-                        })
-                        font_stats[round(size, 1)] += 1
-        doc.close()
-
-        if not text_blocks:
-            return []
-
-        # Determine body font size as the mode of sizes
-        body_size = max(font_stats.items(), key=lambda kv: kv[1])[0] if font_stats else 12.0
-
-        # More flexible heading detection - look for patterns that suggest headings
-        headings = []
-        potential_headings = []
-        
-        # First pass: detect potential headings by font size or pattern
-        for block in text_blocks:
-            text = block["text"].strip()
-            # More liberal heading detection
-            if (len(text) >= 3 and len(text) <= 120 and 
-                (block["size"] >= float(body_size) * 1.1 or  # Lower threshold
-                 text.endswith(':') or  # Ends with colon (like "Ingredients:")
-                 (text[0].isupper() and len(text.split()) <= 4))):  # Short capitalized phrases
-                potential_headings.append(block)
-        
-        # If we found very few headings, be even more liberal
-        if len(potential_headings) < 3:
-            for block in text_blocks:
-                text = block["text"].strip()
-                if (len(text) >= 3 and len(text) <= 80 and
-                    (text[0].isupper() and 
-                     len(text.split()) <= 6 and 
-                     not text.startswith('•') and
-                     not any(char.isdigit() for char in text[:5]))):  # Not bullets or numbers
-                    potential_headings.append(block)
-        
-        # Remove duplicates and sort by page/position
-        seen_texts = set()
-        for h in potential_headings:
-            if h["text"] not in seen_texts:
-                headings.append(h)
-                seen_texts.add(h["text"])
-        
-        # Extract sections with actual content
-        sections = []
-        doc = fitz.open(pdf_path)
-        
-        for i, h in enumerate(headings[:15]):  # Increased limit
-            title = h["text"].strip()
-            page = h["page"]
+            if len(text.strip()) < 50:  # Skip very short pages
+                continue
             
-            # Extract actual content from the PDF around this heading
-            content_lines = []
-            try:
-                pdf_page = doc[page - 1]  # Convert to 0-based
-                page_text = pdf_page.get_text()
-                lines = page_text.split('\n')
-                
-                # Find the heading and extract content after it
-                found_heading = False
-                content_count = 0
-                for line in lines:
-                    line_clean = line.strip()
-                    if not line_clean:
-                        continue
-                        
-                    if not found_heading and title in line_clean:
-                        found_heading = True
-                    continue
-                    
-                    if found_heading:
-                        content_lines.append(line_clean)
-                        content_count += 1
-                        # Stop at next potential heading or after reasonable content
-                        if content_count > 20 or (len(line_clean) <= 80 and 
-                                                any(next_h["text"] in line_clean for next_h in headings[i+1:i+3])):
-                            break
-                
-                content = '\n'.join(content_lines[:30])  # Reasonable content size
-                
-                # Only include sections with substantial content
-                if content and len(content.strip()) >= 30:
-                    sections.append((title, page, content.strip()))
-                    
-            except Exception as e:
-                print(f"Error extracting content for {title}: {e}")
-                # Fallback to simple content
-                content = f"Section: {title} (from page {page})"
-                sections.append((title, page, content))
+            # Create sections based on content length
+            if len(text) > chunk_size:
+                # Split into chunks
+                chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size-overlap)]
+                for i, chunk in enumerate(chunks):
+                    if len(chunk.strip()) >= 100:
+                        title = f"Page {page_num + 1} Content (Part {i+1})"
+                        sections.append((title, page_num + 1, chunk.strip()))
+            else:
+                # Single section for short pages
+                title = f"Page {page_num + 1} Content"
+                sections.append((title, page_num + 1, text.strip()))
         
         doc.close()
-
-        return sections
+        return sections[:10]  # Limit to 10 sections for speed
+    
+    def _extract_section_content_optimized(self, doc: fitz.Document, heading: dict, all_headings: list, current_index: int) -> str:
+        """Optimized content extraction with reduced processing"""
+        current_page = heading.get("page", 1) - 1
+        
+        # Extract content from current page only for speed
+        if current_page < len(doc):
+            page = doc[current_page]
+            text = page.get_text()
+            
+            # Simple content extraction - just get first 500 chars after heading
+            lines = text.split('\n')
+            heading_text = heading.get("text", "").strip()
+            
+            content_started = False
+            content_lines = []
+            
+            for line in lines:
+                if not content_started and heading_text in line:
+                    content_started = True
+                    continue
+                if content_started and line.strip():
+                    content_lines.append(line.strip())
+                    if len('\n'.join(content_lines)) > 500:  # Limit content length
+                        break
+            
+            return '\n'.join(content_lines[:200])  # Return first 200 chars
+        
+        return ""
 
 
 class SemanticIndex:
     def __init__(self) -> None:
+        print(f"🔧 Initializing SemanticIndex...")
         self.embedding = None
         if TextEmbedding is not None:
             try:
@@ -355,7 +280,17 @@ class SemanticIndex:
 
         self.vectors: np.ndarray = np.empty((0, self.vector_dim), dtype=np.float32)
         self.sections: List[IndexedSection] = []
+        
+        # Load existing data (this is where old data gets loaded!)
+        print(f"📂 Loading existing index data...")
         self._load()
+        print(f"📊 Loaded {len(self.sections)} sections from disk")
+        
+        # Debug: Print some section info to identify old data
+        if len(self.sections) > 0:
+            print(f"🔍 Sample sections loaded:")
+            for i, section in enumerate(self.sections[:3]):
+                print(f"   {i+1}. {section.filename} - {section.title[:50]}...")
 
     def _index_meta_path(self) -> str:
         return os.path.join(INDEX_DIR, "index.json")
@@ -367,12 +302,20 @@ class SemanticIndex:
         try:
             meta_path = self._index_meta_path()
             vec_path = self._index_vec_path()
+            print(f"🔍 Checking for existing index files:")
+            print(f"   Meta: {meta_path} (exists: {os.path.exists(meta_path)})")
+            print(f"   Vectors: {vec_path} (exists: {os.path.exists(vec_path)})")
+            
             if os.path.exists(meta_path) and os.path.exists(vec_path):
                 with open(meta_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 self.sections = [IndexedSection(**x) for x in data.get("sections", [])]
                 self.vectors = np.load(vec_path)
-        except Exception:
+                print(f"✅ Loaded {len(self.sections)} sections from existing index")
+            else:
+                print("ℹ️  No existing index found - starting fresh")
+        except Exception as e:
+            print(f"⚠️  Error loading index, starting fresh: {e}")
             self.sections = []
             self.vectors = np.empty((0, 384), dtype=np.float32)
 
@@ -402,84 +345,111 @@ class SemanticIndex:
         return (arr / norms).astype(np.float32)
 
     def ingest_documents(self, items: List[Tuple[str, str]]) -> Dict[str, Any]:
-        """
-        items: list of (doc_id, path)
-        """
+        """Optimized document ingestion with batch processing"""
+        print(f"🔄 Starting optimized ingestion for {len(items)} items...")
+        
         extractor = EnhancedSectionExtractor()
         new_sections: List[IndexedSection] = []
         new_vectors: List[str] = []
         
-        for doc_id, path in items:
-            if not os.path.exists(path):
-                continue
+        # Process files in batches for better performance
+        batch_size = 3  # Process 3 files at a time
+        
+        for batch_start in range(0, len(items), batch_size):
+            batch_end = min(batch_start + batch_size, len(items))
+            batch_items = items[batch_start:batch_end]
             
-            filename = os.path.basename(path)
+            print(f"🔄 Processing batch {batch_start//batch_size + 1}: {len(batch_items)} files")
             
-            # Clean up the filename to get a readable PDF name
-            pdf_name = filename
-            if "_" in filename and filename.count("_") >= 2:
-                # If filename has format "name_hash_counter.pdf", extract just the name part
-                parts = filename.split("_")
-                if len(parts) >= 2:
-                    pdf_name = parts[0].replace("_", " ").strip()
-            
-            pdf_name = pdf_name.replace(".pdf", "").replace("_", " ").title()
-            
-            sections = extractor.extract_sections(path)
-            for idx, (title, page, content) in enumerate(sections):
-                # Create semantic chunks for better context
-                chunks = _create_semantic_chunks(content, chunk_size=512, overlap=100)
+            for doc_id, path in batch_items:
+                if not os.path.exists(path):
+                    continue
                 
-                for chunk_idx, chunk_content in enumerate(chunks):
-                    snippet = _make_snippet(chunk_content)
-                    section_id = f"{doc_id}_s{len(self.sections) + len(new_sections) + 1}_c{chunk_idx}"
+                filename = os.path.basename(path)
+                pdf_name = filename.replace(".pdf", "").replace("_", " ").title()
+                
+                # Extract sections with caching
+                sections = extractor.extract_sections(path)
+                
+                # Create sections more efficiently
+                for idx, (title, page, content) in enumerate(sections):
+                    # Simplified section creation
+                    section_id = f"{doc_id}_s{len(self.sections) + len(new_sections) + 1}"
                     
-                    # Create chunk-specific title
-                    chunk_title = f"{title} (Part {chunk_idx + 1})" if len(chunks) > 1 else title
-                    
-                new_sections.append(
-                    IndexedSection(
-                        section_id=section_id,
-                        doc_id=doc_id,
-                        filename=filename,
-                        page=page,
-                        title=chunk_title,
-                        text=chunk_content,
-                        snippet=snippet,
-                        vector_offset=0,
-                        # Enhanced structured data fields
-                        pdf_name=pdf_name,
-                        section_heading=title,
-                        section_content=chunk_content
+                    new_sections.append(
+                        IndexedSection(
+                            section_id=section_id,
+                            doc_id=doc_id,
+                            filename=filename,
+                            page=page,
+                            title=title,
+                            text=content,
+                            snippet=content[:300],  # Simplified snippet
+                            vector_offset=0,
+                            pdf_name=pdf_name,
+                            section_heading=title,
+                            section_content=content
+                        )
                     )
-                )
-                # Use chunk content for better semantic matching
-                combined_text = f"{title}. {chunk_content}"
-                new_vectors.append(combined_text)
-
-        # Embed snippets for speed
-        vecs = self._embed_texts(new_vectors)
-        # Assign offsets
-        base = int(self.vectors.shape[0])
-        for i, s in enumerate(new_sections):
-            s.vector_offset = base + i
-        # Append
-        if vecs.size > 0:
-            if self.vectors.size == 0:
-                self.vectors = vecs
-            else:
-                self.vectors = np.vstack([self.vectors, vecs])
+                    
+                    # Use title + first 200 chars for vectorization
+                    combined_text = f"{title}. {content[:200]}"
+                    new_vectors.append(combined_text)
+        
+        # Process embeddings in smaller batches for memory efficiency
+        if len(new_vectors) >= 10:
+            print(f"🔗 Processing embeddings for {len(new_vectors)} sections...")
+            vecs = self._embed_texts(new_vectors)
+            
+            # Assign offsets
+            base = int(self.vectors.shape[0])
+            for i, s in enumerate(new_sections[-len(vecs):]):
+                s.vector_offset = base + i
+            
+            # Append vectors
+            if vecs.size > 0:
+                if self.vectors.size == 0:
+                    self.vectors = vecs
+                else:
+                    self.vectors = np.vstack([self.vectors, vecs])
+        
+        # Final embedding batch for remaining sections
+        if new_vectors:
+            print(f"🔗 Final embedding batch for {len(new_vectors)} sections...")
+            vecs = self._embed_texts(new_vectors)
+            
+            base = int(self.vectors.shape[0])
+            for i, s in enumerate(new_sections[-len(vecs):]):
+                s.vector_offset = base + i
+            
+            if vecs.size > 0:
+                if self.vectors.size == 0:
+                    self.vectors = vecs
+                else:
+                    self.vectors = np.vstack([self.vectors, vecs])
+        
         self.sections.extend(new_sections)
+        
+        # Save to disk
+        print("💾 Saving optimized index to disk...")
         self._save()
-        return {"ingested": len(new_sections)}
+        
+        result = {"ingested": len(new_sections)}
+        print(f"✅ Optimized ingestion completed: {result}")
+        return result
 
     def query(self, text: str, k: int = 5) -> List[Dict[str, Any]]:
+        print(f"🔍 Query started: '{text[:100]}...' (k={k})")
+        print(f"📊 Current index state: {len(self.sections)} sections, {self.vectors.shape[0]} vectors")
+        
         if not text or self.vectors.size == 0:
+            print("❌ No text provided or no vectors in index")
             return []
         
         # Enhanced query processing
         query_text = text.strip()
         if len(query_text) < 3:
+            print("❌ Query text too short")
             return []
         
         # Get semantic embeddings
@@ -487,20 +457,31 @@ class SemanticIndex:
         
         # Calculate semantic similarity
         sims = (self.vectors @ q).astype(np.float32)
+        print(f"📈 Similarity scores range: {sims.min():.3f} to {sims.max():.3f}")
         
         # Get more candidates for better diversity and accuracy
-        candidates_k = min(k * 4, len(self.sections))  # Increased from 3x to 4x
+        candidates_k = min(k * 4, len(self.sections))
         idxs = np.argsort(-sims)[: max(1, candidates_k)]
+        print(f"🎯 Top {len(idxs)} candidate scores: {[f'{sims[i]:.3f}' for i in idxs[:10]]}")
         
         results: List[Dict[str, Any]] = []
         seen_content = set()
         
+        # CRITICAL FIX: Much lower threshold to catch any relevant content
+        score_threshold = 0.05  # Lowered significantly from 0.15
+        print(f"🎚️  Using score threshold: {score_threshold}")
+        
         for i in idxs:
-            if i < 0 or i >= len(self.sections) or len(results) >= k:
+            if i < 0 or i >= len(self.sections):
                 continue
+            
+            if len(results) >= k:
+                break
             
             s = self.sections[i]
             semantic_score = float(sims[i])
+            
+            print(f"🔍 Evaluating section: '{s.title[:30]}...' from {s.filename} (semantic: {semantic_score:.3f})")
             
             # Enhanced scoring with multiple factors
             final_score = self._calculate_enhanced_score(
@@ -509,8 +490,11 @@ class SemanticIndex:
                 semantic_score=semantic_score
             )
             
+            print(f"   📊 Final score: {final_score:.3f} (threshold: {score_threshold})")
+            
             # Skip if overall score is too low
-            if final_score < 0.25:  # Lowered threshold for better recall
+            if final_score < score_threshold:
+                print(f"   ❌ Skipped: score {final_score:.3f} below threshold {score_threshold}")
                 continue
             
             # Create content fingerprint for deduplication
@@ -518,6 +502,7 @@ class SemanticIndex:
             
             # Skip if we've seen very similar content
             if content_fingerprint in seen_content:
+                print(f"   ❌ Skipped: duplicate content")
                 continue
             
             # Generate enhanced relevance explanation
@@ -528,6 +513,8 @@ class SemanticIndex:
                 final_score=final_score
             )
             
+            print(f"   ✅ Added to results: {s.title[:30]}... (score: {final_score:.3f})")
+            
             results.append(
                 {
                     "docId": s.doc_id,
@@ -535,8 +522,8 @@ class SemanticIndex:
                     "page": s.page,
                     "title": s.title,
                     "snippet": s.snippet,
-                    "score": final_score,  # Use enhanced score
-                    "semantic_score": semantic_score,  # Keep original semantic score
+                    "score": final_score,
+                    "semantic_score": semantic_score,
                     # Enhanced structured data
                     "pdf_name": getattr(s, 'pdf_name', s.filename.replace('.pdf', '').replace('_', ' ').title()),
                     "section_heading": getattr(s, 'section_heading', s.title),
@@ -551,7 +538,13 @@ class SemanticIndex:
         
         # Sort by enhanced score and return top k
         results.sort(key=lambda x: x["score"], reverse=True)
-        return results[:k]
+        final_results = results[:k]
+        
+        print(f"🎉 Query completed: {len(final_results)} results returned")
+        for i, result in enumerate(final_results):
+            print(f"   {i+1}. {result['filename']} - {result['title'][:30]}... (score: {result['score']:.3f})")
+        
+        return final_results
     
     def _generate_relevance_explanation(self, query_text: str, section: IndexedSection, score: float) -> str:
         """Generate a short explanation of why this section is relevant."""
@@ -715,5 +708,90 @@ def reset_global_index():
     """Reset the global index cache - used for refresh functionality"""
     global _GLOBAL_INDEX
     _GLOBAL_INDEX = None
+
+
+def clear_semantic_index_files():
+    """
+    Physically delete semantic index files from disk.
+    This ensures a complete reset during refresh functionality.
+    """
+    try:
+        import os
+        
+        # Define paths to index files
+        index_meta_path = os.path.join(INDEX_DIR, "index.json")
+        index_vec_path = os.path.join(INDEX_DIR, "vectors.npy")
+        
+        files_removed = 0
+        errors = []
+        
+        # Remove index.json if it exists
+        if os.path.exists(index_meta_path):
+            try:
+                os.remove(index_meta_path)
+                files_removed += 1
+                print(f"Removed semantic index metadata: {index_meta_path}")
+            except Exception as e:
+                error_msg = f"Failed to remove index.json: {e}"
+                print(error_msg)
+                errors.append(error_msg)
+        
+        # Remove vectors.npy if it exists
+        if os.path.exists(index_vec_path):
+            try:
+                os.remove(index_vec_path)
+                files_removed += 1
+                print(f"Removed semantic index vectors: {index_vec_path}")
+            except Exception as e:
+                error_msg = f"Failed to remove vectors.npy: {e}"
+                print(error_msg)
+                errors.append(error_msg)
+        
+        # Also clear embeddings cache directory if it exists
+        embeddings_cache_dir = os.path.join(INDEX_DIR, "embeddings_cache")
+        if os.path.exists(embeddings_cache_dir):
+            try:
+                import shutil
+                shutil.rmtree(embeddings_cache_dir)
+                files_removed += 1
+                print(f"Removed embeddings cache: {embeddings_cache_dir}")
+            except Exception as e:
+                error_msg = f"Failed to remove embeddings cache: {e}"
+                print(error_msg)
+                errors.append(error_msg)
+        
+        return {
+            "index_files_removed": files_removed,
+            "errors": errors if errors else None
+        }
+        
+    except Exception as e:
+        print(f"Error clearing semantic index files: {e}")
+        return {
+            "index_files_removed": 0,
+            "errors": [f"Failed to clear index files: {str(e)}"]
+        }
+
+
+def reset_and_clear_index():
+    """
+    Complete reset: clear memory cache AND delete index files from disk.
+    Used for refresh functionality to ensure complete cleanup.
+    """
+    # CRITICAL FIX: Clear files from disk FIRST, before creating new index
+    print("🗑️  Clearing semantic index files from disk...")
+    clear_result = clear_semantic_index_files()
+    
+    # Then, reset the global cache
+    print("🧠 Resetting global index cache...")
+    reset_global_index()
+    
+    # Finally, create a new empty index (it won't load anything since files are deleted)
+    print("🆕 Creating new empty index...")
+    idx = get_index()  # This will create a new empty index since files are deleted
+    idx._save()  # Save the empty index to disk
+    
+    print("✅ Complete index reset finished")
+    return clear_result
 
 

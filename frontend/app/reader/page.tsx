@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 
 import { Input } from "@/components/ui/input";
 import RelatedPanel from "@/components/RelatedPanel";
-import { Upload, FileText, CheckCircle, AlertCircle, RefreshCw, Search } from "lucide-react";
+import { Upload, FileText, CheckCircle, AlertCircle, Search, Info } from "lucide-react";
 
 type Match = { 
   docId: string; 
@@ -51,53 +51,73 @@ export default function ReaderPage() {
   const [lastSearchTime, setLastSearchTime] = useState<Date | null>(null);
   const [searchDebounceTimer, setSearchDebounceTimer] = useState<NodeJS.Timeout | null>(null);
   
-  // Refresh functionality state
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  
-  // Debug state for selection detection
+  // State for automatic clearing
+  const [isInitializing, setIsInitializing] = useState(true);
 
-
-  // Refresh functionality - clear all storage and reset
-  const onRefresh = async () => {
-    if (isRefreshing) return;
+  // NUCLEAR: Complete state reset function
+  const resetAllState = () => {
+    console.log("🧨 NUCLEAR: Resetting all frontend state...");
+    setLibrary([]);
+    setMatches([]);
+    setSelection("");
+    setCurrentDocId("");
+    setBulkUploadStatus("idle");
+    setFreshUploadStatus("idle");
+    setProcessingFiles([]);
+    setSearchStatus("idle");
+    setIsSearching(false);
+    setLastSearchTime(null);
     
-    const confirmRefresh = window.confirm(
-      "This will delete all uploaded PDFs (bulk, fresh, and viewer) and reset the semantic index. Are you sure?"
-    );
+    // Clear file inputs
+    if (bulkFileInputRef.current) bulkFileInputRef.current.value = "";
+    if (freshFileInputRef.current) freshFileInputRef.current.value = "";
     
-    if (!confirmRefresh) return;
-    
-    setIsRefreshing(true);
-    try {
-      const result = await clearAllStorage();
-      console.log("Storage cleared:", result);
-      
-      // Reset all local state
-      setLibrary([]);
-      setMatches([]);
-      setSelection("");
-      setCurrentDocId("");
-      setBulkUploadStatus("idle");
-      setFreshUploadStatus("idle");
-      setProcessingFiles([]);
-      setSearchStatus("idle");
-      setIsSearching(false);
-      
-      // Clear file inputs
-      if (bulkFileInputRef.current) bulkFileInputRef.current.value = "";
-      if (freshFileInputRef.current) freshFileInputRef.current.value = "";
-      
-      alert(`Successfully cleared ${result.files_removed} files and reset the system!`);
-      
-    } catch (error) {
-      console.error("Error during refresh:", error);
-      alert("Failed to clear storage. Please try again.");
-    } finally {
-      setIsRefreshing(false);
-    }
+    console.log("✅ NUCLEAR: All frontend state reset");
   };
 
-  // Bulk PDF upload for indexing
+  // NUCLEAR: Force clear on every page load
+  useEffect(() => {
+    const nuclearClear = async () => {
+      try {
+        console.log("🧨 NUCLEAR CLEAR: Starting complete system reset...");
+        
+        // Step 1: Clear all backend storage and index
+        const result = await clearAllStorage();
+        console.log("✅ NUCLEAR: Backend cleared:", result);
+        
+        // Step 2: Reset all frontend state
+        resetAllState();
+        
+        // Step 3: Verify clearing worked
+        try {
+          const debugRes = await fetch('/v1/storage/debug');
+          const debugData = await debugRes.json();
+          console.log("🔍 NUCLEAR: Post-clear verification:", debugData);
+          
+          if (debugData.total_pdf_files > 0 || debugData.semantic_index_sections > 0) {
+            console.error("🚨 NUCLEAR FAILURE: Data still exists after clear!");
+            console.error(`Files: ${debugData.total_pdf_files}, Sections: ${debugData.semantic_index_sections}`);
+            alert("CRITICAL: Old data persists after clear. Server restart may be needed.");
+          } else {
+            console.log("🎉 NUCLEAR SUCCESS: Complete system reset verified");
+          }
+        } catch (debugError) {
+          console.error("❌ NUCLEAR: Verification failed:", debugError);
+        }
+        
+      } catch (error) {
+        console.error("🚨 NUCLEAR CLEAR FAILED:", error);
+        alert("CRITICAL: Nuclear clear failed. Please restart the server.");
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    // Execute nuclear clear immediately
+    nuclearClear();
+  }, []); // Run once on mount (page load/refresh)
+
+  // NUCLEAR: Enhanced upload with pre-clear and parallel processing
   const onBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -106,44 +126,73 @@ export default function ReaderPage() {
     setProcessingFiles(files.map(f => f.name));
     
     try {
-      // First, ingest into semantic index with bulk storage type
-      await searchIngest({ files, storage_type: "bulk" });
-      setBulkUploadStatus("processing");
+      // NUCLEAR: Force clear before every upload
+      console.log("🧨 NUCLEAR: Pre-upload clear...");
+      await clearAllStorage();
+      resetAllState();
       
-      // Process each file to get proper docId and add to library
-      const newDocuments: DocumentItem[] = [];
-      for (const file of files) {
+      // Wait a moment for clearing to complete
+      await new Promise(resolve => setTimeout(resolve, 300)); // Reduced from 500ms
+      
+      // Now upload fresh with parallel processing
+      console.log("📤 NUCLEAR: Starting parallel upload...");
+      
+      // Step 1: Upload all files in parallel
+      const uploadPromises = files.map(async (file) => {
         try {
-          const result = await extractOutline({ file, storage_type: "bulk" });
-          newDocuments.push({
-            name: file.name,
-            docId: result.docId,
-            type: "bulk",
-            status: "success"
-          });
+          await searchIngest({ files: [file], storage_type: "bulk" });
+          return { file, status: 'uploaded' };
         } catch (error) {
-          newDocuments.push({
-            name: file.name,
-            docId: `error-${Date.now()}-${Math.random()}`, // Ensure unique ID even for errors
-            type: "bulk",
-            status: "error",
-            error: "Failed to process"
-          });
+          console.error(`❌ Upload failed for ${file.name}:`, error);
+          return { file, status: 'failed', error };
         }
+      });
+      
+      // Wait for all uploads to complete
+      const uploadResults = await Promise.all(uploadPromises);
+      const successfulUploads = uploadResults.filter(r => r.status === 'uploaded');
+      
+      if (successfulUploads.length === 0) {
+        throw new Error("All file uploads failed");
       }
       
-      // Filter out any potential duplicates before adding to library
-      setLibrary(prev => {
-        const existingKeys = new Set(prev.map(d => `${d.type}-${d.docId}`));
-        const filteredNew = newDocuments.filter(d => !existingKeys.has(`${d.type}-${d.docId}`));
-        return [...filteredNew, ...prev];
+      setBulkUploadStatus("processing");
+      
+      // Step 2: Process successful uploads in parallel
+      const processPromises = successfulUploads.map(async ({ file }) => {
+        try {
+          const result = await extractOutline({ file, storage_type: "bulk" });
+          return {
+            name: file.name,
+            docId: result.docId,
+            type: "bulk" as const,
+            status: "success" as const
+          };
+        } catch (error) {
+          console.error(`❌ Processing failed for ${file.name}:`, error);
+          return {
+            name: file.name,
+            docId: `error-${Date.now()}-${Math.random()}`,
+            type: "bulk" as const,
+            status: "error" as const,
+            error: "Failed to process"
+          };
+        }
       });
+      
+      const newDocuments = await Promise.all(processPromises);
+      
+      // Set ONLY the new documents (no merging with old state)
+      setLibrary(newDocuments);
       setBulkUploadStatus("success");
+      
+      console.log(`🎉 NUCLEAR: Parallel upload completed - ${newDocuments.length} new files only`);
       
       // Auto-reset status after 2 seconds
       setTimeout(() => setBulkUploadStatus("idle"), 2000);
       
     } catch (error) {
+      console.error("🚨 NUCLEAR: Upload failed:", error);
       setBulkUploadStatus("error");
       setTimeout(() => setBulkUploadStatus("idle"), 3000);
     } finally {
@@ -151,16 +200,25 @@ export default function ReaderPage() {
     }
   };
 
-  // Fresh PDF upload for immediate reading
+  // NUCLEAR: Enhanced fresh upload with pre-clear
   const onFreshUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
     
-    const file = files[0]; // Only take the first file for fresh upload
+    const file = files[0];
     setFreshUploadStatus("uploading");
     
     try {
-      // Ingest into semantic index with fresh storage type
+      // NUCLEAR: Force clear before every upload
+      console.log("🧨 NUCLEAR: Pre-upload clear...");
+      await clearAllStorage();
+      resetAllState();
+      
+      // Wait a moment for clearing to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Now upload fresh
+      console.log("📤 NUCLEAR: Starting fresh upload...");
       await searchIngest({ files: [file], storage_type: "fresh" });
       setFreshUploadStatus("processing");
       
@@ -168,7 +226,7 @@ export default function ReaderPage() {
       const result = await extractOutline({ file, storage_type: "fresh" });
       setCurrentDocId(result.docId);
       
-      // Add to library
+      // Add ONLY the new document (no merging)
       const newDoc: DocumentItem = {
         name: file.name,
         docId: result.docId,
@@ -176,21 +234,16 @@ export default function ReaderPage() {
         status: "success"
       };
       
-      // Filter out any potential duplicates before adding to library
-      setLibrary(prev => {
-        const existingKeys = new Set(prev.map(d => `${d.type}-${d.docId}`));
-        const uniqueKey = `${newDoc.type}-${newDoc.docId}`;
-        if (existingKeys.has(uniqueKey)) {
-          return prev; // Don't add if duplicate
-        }
-        return [newDoc, ...prev];
-      });
+      setLibrary([newDoc]); // Set ONLY this file, don't merge
       setFreshUploadStatus("success");
+      
+      console.log(`🎉 NUCLEAR: Fresh upload completed - ${file.name} only`);
       
       // Auto-reset status after 2 seconds
       setTimeout(() => setFreshUploadStatus("idle"), 2000);
       
     } catch (error) {
+      console.error("🚨 NUCLEAR: Fresh upload failed:", error);
       setFreshUploadStatus("error");
       setTimeout(() => setFreshUploadStatus("idle"), 3000);
     }
@@ -304,9 +357,49 @@ export default function ReaderPage() {
           <div className="flex items-center gap-3">
             <Link href="/" className="font-semibold">Document Intelligence</Link>
             <span className="text-muted-foreground">/ Reader</span>
+            {isInitializing && (
+              <span className="text-xs text-blue-600 flex items-center gap-1">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                Preparing workspace...
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3">
-            {/* Bulk Upload */}
+            {/* EMERGENCY: Manual clear button for debugging */}
+            <Button
+              className="border border-red-500 bg-red-50 text-red-700 hover:bg-red-100 rounded-xl gap-2 h-8 px-3 text-xs"
+              onClick={async () => {
+                try {
+                  console.log("🧨 NUCLEAR MANUAL CLEAR...");
+                  
+                  // Step 1: Clear backend
+                  const result = await clearAllStorage();
+                  console.log("✅ NUCLEAR: Backend clear result:", result);
+                  
+                  // Step 2: Reset frontend completely
+                  resetAllState();
+                  
+                  // Step 3: Verify clearing
+                  const debugRes = await fetch('/v1/storage/debug');
+                  const debugData = await debugRes.json();
+                  console.log("🔍 NUCLEAR: Verification:", debugData);
+                  
+                  if (debugData.total_pdf_files === 0 && debugData.semantic_index_sections === 0) {
+                    alert(`🎉 NUCLEAR SUCCESS: Obliterated ${result.files_removed} files. System is now clean!`);
+                  } else {
+                    alert(`🚨 NUCLEAR FAILURE: ${debugData.total_pdf_files} files and ${debugData.semantic_index_sections} sections still exist!`);
+                  }
+                  
+                } catch (error) {
+                  console.error("❌ NUCLEAR CLEAR FAILED:", error);
+                  alert("NUCLEAR CLEAR FAILED - check console and restart server");
+                }
+              }}
+            >
+              🧨 NUCLEAR CLEAR
+            </Button>
+
+            {/* Upload buttons - disabled during initialization */}
             <div className="flex items-center gap-2">
               <input 
                 ref={bulkFileInputRef} 
@@ -319,7 +412,7 @@ export default function ReaderPage() {
               <Button 
                 className="border border-border bg-background text-foreground hover:bg-muted rounded-xl gap-2" 
                 onClick={() => bulkFileInputRef.current?.click()} 
-                disabled={bulkUploadStatus !== "idle"}
+                disabled={bulkUploadStatus !== "idle" || isInitializing}
               >
                 <Upload className="w-4 h-4" />
                 <AnimatePresence mode="wait">
@@ -379,8 +472,7 @@ export default function ReaderPage() {
               </Button>
             </div>
 
-            {/* Fresh Upload */}
-          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <input 
                 ref={freshFileInputRef} 
                 type="file" 
@@ -391,7 +483,7 @@ export default function ReaderPage() {
               <Button 
                 className="rounded-xl gap-2" 
                 onClick={() => freshFileInputRef.current?.click()} 
-                disabled={freshUploadStatus !== "idle"}
+                disabled={freshUploadStatus !== "idle" || isInitializing}
               >
                 <FileText className="w-4 h-4" />
                 <AnimatePresence mode="wait">
@@ -450,20 +542,10 @@ export default function ReaderPage() {
                 </AnimatePresence>
               </Button>
             </div>
-            
-            {/* Refresh Button */}
-            <Button
-              className="border border-border bg-background text-foreground hover:bg-muted rounded-xl gap-2 h-8 px-3 text-xs"
-              onClick={onRefresh}
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              {isRefreshing ? "Clearing..." : "Refresh"}
-            </Button>
           </div>
         </div>
 
-        {/* Upload Progress Animation */}
+        {/* Enhanced Upload Progress Animation */}
         <AnimatePresence>
           {(bulkUploadStatus === "uploading" || bulkUploadStatus === "processing") && processingFiles.length > 0 && (
             <motion.div
@@ -473,9 +555,24 @@ export default function ReaderPage() {
               className="border-t bg-muted/30 overflow-hidden"
             >
               <div className="max-w-7xl mx-auto px-4 py-3">
-                <div className="text-sm font-medium mb-2">
-                  Processing {processingFiles.length} file(s)...
+                <div className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  {bulkUploadStatus === "uploading" ? "Uploading files..." : "Processing files..."}
+                  <span className="text-xs text-muted-foreground">
+                    ({processingFiles.length} file{processingFiles.length !== 1 ? 's' : ''})
+                  </span>
                 </div>
+                
+                {/* Progress Bar */}
+                <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+                  <motion.div
+                    className="bg-blue-500 h-2 rounded-full"
+                    initial={{ width: "0%" }}
+                    animate={{ width: bulkUploadStatus === "uploading" ? "50%" : "100%" }}
+                    transition={{ duration: 0.5, ease: "easeInOut" }}
+                  />
+                </div>
+                
                 <div className="space-y-1">
                   {processingFiles.map((filename, index) => (
                     <motion.div
@@ -485,8 +582,13 @@ export default function ReaderPage() {
                       transition={{ delay: index * 0.1 }}
                       className="text-xs text-muted-foreground flex items-center gap-2"
                     >
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                      <div className={`w-2 h-2 rounded-full ${
+                        bulkUploadStatus === "uploading" ? "bg-blue-500 animate-pulse" : "bg-green-500"
+                      }`} />
                       {filename}
+                      {bulkUploadStatus === "processing" && (
+                        <span className="text-green-600">✓ Processed</span>
+                      )}
                     </motion.div>
                   ))}
                 </div>
@@ -497,6 +599,36 @@ export default function ReaderPage() {
       </header>
 
       <main className="max-w-[1600px] mx-auto px-4 py-6 grid gap-6 lg:grid-cols-[16rem_1fr_20rem]">
+        {/* Show initialization message */}
+        {isInitializing && (
+          <div className="lg:col-span-3 mb-4">
+            <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+              <div className="flex items-center gap-2 text-gray-700">
+                <div className="w-4 h-4 border border-gray-500 border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm font-medium">Preparing clean workspace...</span>
+              </div>
+              <p className="text-xs text-gray-600 mt-1">
+                Clearing previous session data for fresh start.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Add info banner about refresh behavior */}
+        {library.length === 0 && !isInitializing && (
+          <div className="lg:col-span-3 mb-4">
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2 text-blue-900">
+                <Info className="w-4 h-4" />
+                <span className="text-sm font-medium">One-Time Use Workflow</span>
+              </div>
+              <p className="text-xs text-blue-700 mt-1">
+                Upload PDFs for this session. To start fresh with new documents, simply refresh your browser.
+              </p>
+            </div>
+          </div>
+        )}
+
         <aside className="space-y-3">
           <h3 className="text-sm font-semibold">Library</h3>
           <div className="space-y-2 text-sm">
@@ -593,7 +725,17 @@ export default function ReaderPage() {
             transition={{ delay: 0.3, duration: 0.4 }}
           >
             <Button 
-              className="border border-border bg-background text-foreground hover:bg-muted h-8 px-3 text-xs w-full gap-2 hover:scale-105 transition-transform"
+              className="
+                border-0
+                bg-gradient-to-r from-blue-500 to-purple-600 text-white 
+                hover:from-blue-600 hover:to-purple-700
+                dark:from-blue-600 dark:to-purple-700
+                dark:hover:from-blue-700 dark:hover:to-purple-800
+                h-8 px-3 text-xs w-full gap-2 
+                hover:scale-105 transition-all duration-200
+                shadow-md hover:shadow-lg
+                font-medium
+              "
               onClick={() => {
                 // Try to get selection from Adobe PDF API directly
                 console.log("🔍 Finding relevant content using Adobe API...");
@@ -634,9 +776,9 @@ export default function ReaderPage() {
                 animate={{ rotate: [0, 360] }}
                 transition={{ duration: 2, repeat: Infinity, repeatType: "loop" }}
               >
-                <Search className="w-3 h-3" />
+                <Search className="w-3 h-3 text-white" />
               </motion.div>
-              Find Relevant Content
+              <span className="text-white font-medium">Find Relevant Content</span>
             </Button>
           </motion.div>
           

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 
 # Load environment variables from .env file manually
@@ -40,6 +41,8 @@ app.add_middleware(
     allow_origins=["*"], allow_credentials=True,
     allow_methods=["*"], allow_headers=["*"],
 )
+
+# REMOVED: Server startup clearing - now handled by frontend on page load
 
 @app.get("/health", response_class=PlainTextResponse)
 def health():
