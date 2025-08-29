@@ -28,8 +28,8 @@ def validate_environment():
     tts_provider = os.environ.get("TTS_PROVIDER", "").lower()
     
     if llm_provider == "gemini":
-        if not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") and not os.environ.get("GEMINI_API_KEY"):
-            warnings.append("⚠️  Gemini LLM enabled but no credentials found (GOOGLE_APPLICATION_CREDENTIALS or GEMINI_API_KEY)")
+        if not os.environ.get("GOOGLE_API_KEY"):
+            warnings.append("⚠️  Gemini LLM enabled but no credentials found (GOOGLE_API_KEY)")
     elif llm_provider == "ollama":
         warnings.append("ℹ️  Using Ollama for local LLM processing")
     else:
@@ -95,7 +95,7 @@ def main():
     # Print configuration summary
     print("📋 Configuration Summary:")
     print(f"   Host: {os.environ.get('HOST', '0.0.0.0')}")
-    print(f"   Port: {os.environ.get('PORT', '8080')}")
+    print(f"   Port: {os.environ.get('PORT', '10000')}")
     print(f"   LLM Provider: {os.environ.get('LLM_PROVIDER', 'none')}")
     print(f"   TTS Provider: {os.environ.get('TTS_PROVIDER', 'none')}")
     print(f"   Store Directory: {os.environ.get('STORE_DIR', './store')}")
@@ -103,11 +103,15 @@ def main():
     
     # Start the FastAPI application
     print("🌟 Starting FastAPI server...")
-    backend_port = int(os.environ.get("BACKEND_PORT", os.environ.get("PORT", "8000")))
+    
+    # CRITICAL FIX: Use Render's PORT environment variable
+    # Render forwards traffic to the PORT env var, so we must bind to it
+    render_port = int(os.environ.get("PORT", "10000"))
+    
     uvicorn.run(
         "main:app",
-        host=os.environ.get("HOST", "0.0.0.0"),
-        port=backend_port,
+        host="0.0.0.0",  # Must bind to 0.0.0.0 for Render
+        port=render_port,  # Use Render's PORT variable
         workers=1,
         log_level="info",
         access_log=True
