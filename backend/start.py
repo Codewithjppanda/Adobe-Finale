@@ -92,10 +92,9 @@ def main():
     # Setup directories
     setup_directories()
     
-    # Determine port based on environment
-    # For Render: Use PORT environment variable (main service)
-    # For Docker: Use BACKEND_PORT or fallback to 8000
-    port = int(os.environ.get("PORT", os.environ.get("BACKEND_PORT", "8000")))
+    # For Docker multi-service setup: Always use port 8000 for backend
+    # Nginx will proxy from port 10000 (Render's PORT) to this backend port
+    port = int(os.environ.get("BACKEND_PORT", "8000"))
     
     # Print configuration summary
     print("📋 Configuration Summary:")
