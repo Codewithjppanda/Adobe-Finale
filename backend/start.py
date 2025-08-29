@@ -92,10 +92,15 @@ def main():
     # Setup directories
     setup_directories()
     
+    # Determine port based on environment
+    # For Render: Use PORT environment variable (main service)
+    # For Docker: Use BACKEND_PORT or fallback to 8000
+    port = int(os.environ.get("PORT", os.environ.get("BACKEND_PORT", "8000")))
+    
     # Print configuration summary
     print("📋 Configuration Summary:")
-    print(f"   Host: {os.environ.get('HOST', '0.0.0.0')}")
-    print(f"   Port: {os.environ.get('PORT', '10000')}")
+    print(f"   Host: 0.0.0.0")
+    print(f"   Port: {port}")
     print(f"   LLM Provider: {os.environ.get('LLM_PROVIDER', 'none')}")
     print(f"   TTS Provider: {os.environ.get('TTS_PROVIDER', 'none')}")
     print(f"   Store Directory: {os.environ.get('STORE_DIR', './store')}")
@@ -104,14 +109,10 @@ def main():
     # Start the FastAPI application
     print("🌟 Starting FastAPI server...")
     
-    # CRITICAL FIX: Use Render's PORT environment variable
-    # Render forwards traffic to the PORT env var, so we must bind to it
-    render_port = int(os.environ.get("PORT", "10000"))
-    
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",  # Must bind to 0.0.0.0 for Render
-        port=render_port,  # Use Render's PORT variable
+        host="0.0.0.0",
+        port=port,
         workers=1,
         log_level="info",
         access_log=True
