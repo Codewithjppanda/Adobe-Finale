@@ -1,12 +1,41 @@
-1. Frontend Setup
+📄 Document Intelligence Platform
 
-In the frontend/ directory, create a .env.local file and add the following line:
+A full-stack application that processes PDFs, generates outlines, provides contextual recommendations, and integrates with LLMs and TTS engines.
+The project consists of a FastAPI backend and a Next.js (Tailwind v4) frontend, packaged into a single Docker container for easy deployment.
+
+🚀 Features
+
+PDF Outline Extraction – Automatically generate structured headings (Title, H1, H2, H3)
+
+Contextual Recommendations – Personalized insights based on persona and job inputs
+
+Semantic Search – Index and query across PDFs for relevant matches
+
+LLM Integration – Configurable with Gemini (default) or other providers
+
+Text-to-Speech (TTS) – Azure TTS integration for voice output
+
+Single-Container Deployment – Frontend and backend bundled into one Docker image
+
+📂 Project Structure
+.
+├── backend/      # FastAPI application
+├── frontend/     # Next.js + Tailwind v4 application
+└── store/        # PDF persistence (runtime)
+
+⚙️ Environment Setup
+
+Before running the project, configure environment variables for both frontend and backend.
+
+1. Frontend
+
+Create frontend/.env.local:
 
 NEXT_PUBLIC_ADOBE_EMBED_CLIENT_ID=your_adobe_client_id
 
-2. Backend Setup
+2. Backend
 
-In the backend/ directory, create a .env file and add the following configuration:
+Create backend/.env:
 
 # API Keys
 GOOGLE_API_KEY=your_google_api_key
@@ -14,86 +43,105 @@ GEMINI_API_KEY=your_gemini_api_key
 AZURE_TTS_KEY=your_azure_tts_key
 AZURE_TTS_REGION=your_azure_region
 
-# Enable features
+# Features
 LLM_PROVIDER=gemini
 TTS_PROVIDER=azure
 GEMINI_MODEL=gemini-2.5-flash
 
-Docker Setup (Single Container)
 
-Once you have set up the environment files, you can build and run the application using Docker.
+👉 Replace the placeholders (your_*) with your actual credentials.
 
-Download the ZIP file and extract it.
+🐳 Docker Deployment
 
-Open the project in your code editor.
+Clone or download the project.
 
-Open your terminal in the project root and run the following command to build and start the project:
+Open a terminal in the project root.
 
-docker build --platform linux/amd64 -t doc-intelligence . && docker run -d --name doc-intelligence-app -e ADOBE_EMBED_API_KEY=your_adobe_client_id -e LLM_PROVIDER=gemini -e GEMINI_MODEL=gemini-2.5-flash -e TTS_PROVIDER=azure -e AZURE_TTS_KEY=your_azure_tts_key -e AZURE_TTS_ENDPOINT=your_azure_tts_endpoint -p 8080:8080 doc-intelligence
+Build and run the container:
+
+docker build --platform linux/amd64 -t doc-intelligence .
+docker run -d --name doc-intelligence-app \
+  -e ADOBE_EMBED_API_KEY=your_adobe_client_id \
+  -e LLM_PROVIDER=gemini \
+  -e GEMINI_MODEL=gemini-2.5-flash \
+  -e TTS_PROVIDER=azure \
+  -e AZURE_TTS_KEY=your_azure_tts_key \
+  -e AZURE_TTS_ENDPOINT=your_azure_tts_endpoint \
+  -p 8080:8080 doc-intelligence
 
 
-Important: Replace the placeholders (your_*) with your actual keys and endpoints.
+Open http://localhost:8080
+ in your browser.
 
-Once the Docker container is running, open your browser and visit:
-
-http://localhost:8080
-
+🖥️ Development Setup
 Backend (FastAPI)
-
-Location: backend/
-
-Endpoints:
-
-POST /v1/outline — Upload a PDF or pass docId to get outline { level, text, page }[]
-
-GET /v1/files/{docId} — Serve persisted PDFs
-
-POST /v1/persona/analyze — Persona and job inputs → extracted_sections and subsection_analysis
-
-POST /v1/search/ingest — Index PDFs (files or docIds) for semantic search
-
-POST /v1/search/query — Query related sections across the indexed PDFs
-
-POST /v1/insights — Optional LLM insights from selection + matches
-
-Dev Run
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
-# http://localhost:8000/health
+# Runs at http://localhost:8000
 
 Frontend (Next.js + Tailwind v4)
-
-Location: frontend/
-
-Configure Adobe Embed: Create frontend/.env.local
-
-NEXT_PUBLIC_ADOBE_EMBED_CLIENT_ID=your_adobe_client_id
-
-Dev Run
 cd frontend
 npm install
 npm run dev
-# http://localhost:3000
+# Runs at http://localhost:3000
 
-Runtime Environment (Evaluation)
+📡 API Endpoints
+Outline & Files
 
-Provide the following API keys and configurations in your environment:
+POST /v1/outline → Upload a PDF or use docId to get structured outline
 
-# API Keys
+GET /v1/files/{docId} → Serve persisted PDFs
+
+Persona & Recommendations
+
+POST /v1/persona/analyze → Analyze persona & job input for recommendations
+
+Semantic Search
+
+POST /v1/search/ingest → Index PDFs for semantic search
+
+POST /v1/search/query → Query relevant sections across indexed PDFs
+
+Insights
+
+POST /v1/insights → (Optional) LLM-based insights on selected content
+
+📝 Runtime Notes
+
+PDFs are persisted under backend/store/ using a content-hash as docId.
+
+The frontend is exported statically and served by FastAPI at /.
+
+Current setup is CPU-only and offline; can be extended with external LLM integrations.
+
+📄 Example .env.example
+
+To make sharing safer, you can include example environment files:
+
+frontend/.env.local.example
+
+NEXT_PUBLIC_ADOBE_EMBED_CLIENT_ID=your_adobe_client_id
+
+
+backend/.env.example
+
 GOOGLE_API_KEY=your_google_api_key
 GEMINI_API_KEY=your_gemini_api_key
 AZURE_TTS_KEY=your_azure_tts_key
 AZURE_TTS_REGION=your_azure_region
 
-# Enable features
 LLM_PROVIDER=gemini
 TTS_PROVIDER=azure
 GEMINI_MODEL=gemini-2.5-flash
 
-Where Features Show Up
+📌 Tech Stack
 
-Right “Outline” → From backend/process_pdfs.py
+Backend: FastAPI, Uvicorn, Python
 
-Left “Contextual Recommendations” → From backend/persona_analyzer.py
+Frontend: Next.js, Tailwind v4
+
+AI/ML: Google Gemini, Azure TTS
+
+Deployment: Docker (single container)
