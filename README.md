@@ -17,7 +17,7 @@ Before you start the Docker container, you need to set up environment variables 
 In the `frontend/` directory, create a `.env.local` file and add the following line:
 
 ```ini
-NEXT_PUBLIC_ADOBE_EMBED_CLIENT_ID=6ffd0d77e88743c18889c48c3064c451
+NEXT_PUBLIC_ADOBE_EMBED_CLIENT_ID=adobe
 ```
 
 ### 2. **Backend Setup**
@@ -111,9 +111,8 @@ Provide the following API keys and configurations in your environment:
 
 ```bash
 # API Keys
-GOOGLE_API_KEY=AIzaSyCx6vT2usg0NUmn5HWeULfjpId1o-dK2cg
-GEMINI_API_KEY=AIzaSyCx6vT2usg0NUmn5HWeULfjpId1o-dK2cg
-AZURE_TTS_KEY=9D11SwxpHbQrnWCFYt73vKShJGponxUOyfUvcaHDHh6Mp8GdpjNkJQQJ99BHACGhslBXJ3w3AAAYACOGQ9Xr
+GEMINI_API_KEY=gemini
+AZURE_TTS_KEY=azure
 AZURE_TTS_REGION=centralindia
 
 # Enable features  
