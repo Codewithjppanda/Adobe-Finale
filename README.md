@@ -26,9 +26,8 @@ In the `backend/` directory, create a `.env` file and add the following configur
 
 ```bash
 # API Keys
-GOOGLE_API_KEY=AIzaSyCx6vT2usg0NUmn5HWeULfjpId1o-dK2cg
-GEMINI_API_KEY=AIzaSyCx6vT2usg0NUmn5HWeULfjpId1o-dK2cg
-AZURE_TTS_KEY=9D11SwxpHbQrnWCFYt73vKShJGponxUOyfUvcaHDHh6Mp8GdpjNkJQQJ99BHACGhslBXJ3w3AAAYACOGQ9Xr
+GEMINI_API_KEY=gemini
+AZURE_TTS_KEY=azure
 AZURE_TTS_REGION=centralindia
 
 # Enable features  
